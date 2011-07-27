@@ -1,5 +1,6 @@
 #include "request.h"
 #include "log.h"
+#include "mime.h"
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
@@ -64,13 +65,7 @@ void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QStrin
 QString getMimeType(QFile & file)
 {
     QFileInfo file_info(file);
-    QString ext = file_info.suffix();
-    if (ext == "html" || ext == "htm")
-        return "text/html";
-    else if (ext == "jpg")
-        return "image/jpeg";
-    else
-        return "application/octet-stream";
+    return Mime::instance().getMimeType(file_info.suffix());
 }
 
 void Request::setRootPath(QString root_path)

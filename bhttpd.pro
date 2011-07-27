@@ -20,7 +20,8 @@ SOURCES += main.cpp \
     log.cpp \
     request.cpp \
     settings.cpp \
-    serverthread.cpp
+    serverthread.cpp \
+    mime.cpp
 
 HEADERS += \
     server.h \
@@ -28,4 +29,5 @@ HEADERS += \
     request.h \
     settings.h \
     serverthread.h \
-    common.h
+    common.h \
+    mime.h

@@ -1,6 +1,5 @@
 #include "log.h"
 #include "settings.h"
-#include <QMutex>
 #include <iostream>
 #include <fstream>
 
