@@ -27,4 +27,5 @@ HEADERS += \
     log.h \
     request.h \
     settings.h \
-    serverthread.h
+    serverthread.h \
+    common.h

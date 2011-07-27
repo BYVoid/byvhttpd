@@ -1,19 +1,20 @@
-#include <QtCore/QCoreApplication>
-#include <QDir>
-#include <QVariantList>
+#include "common.h"
 #include "serverthread.h"
 #include "request.h"
 #include "settings.h"
 #include "log.h"
+#include <QtCore/QCoreApplication>
+#include <QDir>
+#include <QVariantList>
 
 void initialize()
 {
-    Log::instance() << "byvhttpd\n";
+    Log::instance() << APPLICATION_NANE << '\n';
 
-    QString root_path = Settings::instance().value("site/root_path", "").toString();
+    QString root_path = Settings::instance().value("site/root_path").toString();
     Request::setRootPath(root_path);
 
-    quint64 buffer_size = Settings::instance().value("httpd/buffer_size", 1048576).toULongLong();
+    quint64 buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
     Request::setBufferSize(buffer_size);
 }
 

@@ -11,7 +11,7 @@ Settings & Settings::instance()
 
 Settings::Settings()
 {
-    settings = new QSettings("byvhttpd.ini", QSettings::IniFormat);
+    settings = new QSettings(CONFIG_FILE, QSettings::IniFormat);
 }
 
 QVariant Settings::value(const QString &key, const QVariant &defaultValue) const

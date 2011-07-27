@@ -1,8 +1,5 @@
 #include "serverthread.h"
 #include "log.h"
-#include <QMutex>
-
-extern QMutex mutex_log;
 
 ServerThread::ServerThread(QObject *parent) :
     QThread(parent),

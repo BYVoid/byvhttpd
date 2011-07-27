@@ -1,7 +1,7 @@
 #ifndef REQUEST_H
 #define REQUEST_H
 
-#include <QString>
+#include "common.h"
 #include <QThread>
 #include <QTcpSocket>
 

@@ -1,6 +1,7 @@
 #ifndef SERVERTHREAD_H
 #define SERVERTHREAD_H
 
+#include "common.h"
 #include "server.h"
 #include <QThread>
 

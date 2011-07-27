@@ -1,7 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <QString>
+#include "common.h"
 
 class Log
 {

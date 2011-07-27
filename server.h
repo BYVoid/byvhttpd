@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include "common.h"
 #include <QTcpServer>
 
 class Server : public QTcpServer

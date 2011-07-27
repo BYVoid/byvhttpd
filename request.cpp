@@ -1,15 +1,14 @@
+#include "request.h"
+#include "log.h"
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
 #include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
-#include <QMutex>
-#include "request.h"
-#include "log.h"
 
 QString Request::s_root_path;
-quint64 Request::s_buffer_size = 65536;
+quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
 
 QMutex mutex_log;
 
@@ -47,7 +46,7 @@ void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QStrin
     else if (code == 404)
         socket->write("HTTP/1.0 404 Not Found\r\n");
 
-    properties["Server"] = "byvhttpd";
+    properties["Server"] = APPLICATION_IDENTIFIER;
     properties["Connection"] = "close";
     properties["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
 

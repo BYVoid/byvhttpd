@@ -19,7 +19,7 @@ Log & Log::instance()
 Log::Log()
 {
     show_log = Settings::instance().value("httpd/show_log", true).toBool();
-    QString filename = Settings::instance().value("httpd/logfile", "access.log").toString();
+    QString filename = Settings::instance().value("httpd/logfile", DEFAULT_HTTPD_LOGFILE).toString();
 
     if (filename != "")
     {
