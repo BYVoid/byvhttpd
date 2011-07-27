@@ -4,16 +4,16 @@
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
-#include <QFile>
 #include <QFileInfo>
 #include <QDateTime>
+#include <QMutex>
 
 QString Request::s_root_path;
 quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
 
 QMutex mutex_log;
 
-bool getRequestProperties(QTcpSocket * socket, QMap<QString, QString> & properties)
+bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
 {
     QByteArray buffer = socket->readAll();
     QTextStream reader(buffer, QIODevice::ReadOnly);
@@ -22,9 +22,9 @@ bool getRequestProperties(QTcpSocket * socket, QMap<QString, QString> & properti
     if (sec.count() != 3)
         return false;
 
-    properties["_method"] = sec[0];
-    properties["_path"] = sec[1];
-    properties["_protocol"] = sec[2];
+    header["_method"] = sec[0];
+    header["_path"] = sec[1];
+    header["_protocol"] = sec[2];
 
     while (!reader.atEnd())
     {
@@ -34,25 +34,42 @@ bool getRequestProperties(QTcpSocket * socket, QMap<QString, QString> & properti
             continue;
         QString key = line.mid(0, pos).toLower();
         QString value = line.mid(pos + 2);
-        properties[key] = value;
+        header[key] = value;
     }
 
     return true;
 }
 
-void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QString> & properties)
+void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QString> & header)
 {
-    if (code == 200)
-        socket->write("HTTP/1.0 200 Ok\r\n");
-    else if (code == 404)
-        socket->write("HTTP/1.0 404 Not Found\r\n");
+    socket->write("HTTP/1.0 ");
 
-    properties["Server"] = APPLICATION_IDENTIFIER;
-    properties["Connection"] = "close";
-    properties["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
+    switch (code)
+    {
+    case 200:
+        socket->write(HTTP_STATUS_200);
+        break;
+    case 301:
+        socket->write(HTTP_STATUS_301);
+        break;
+    case 403:
+        socket->write(HTTP_STATUS_403);
+        break;
+    case 404:
+        socket->write(HTTP_STATUS_404);
+        break;
+    default:
+        socket->write(QString(code).toAscii());
+    }
+
+    socket->write("\r\n");
+
+    header["Server"] = APPLICATION_IDENTIFIER;
+    header["Connection"] = "close";
+    header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
 
     QMap<QString,QString>::iterator it;
-    for (it = properties.begin(); it != properties.end(); ++it)
+    for (it = header.begin(); it != header.end(); ++it)
     {
         socket->write(it.key().toAscii());
         socket->write(": ");
@@ -66,6 +83,32 @@ QString getMimeType(QFile & file)
 {
     QFileInfo file_info(file);
     return Mime::instance().getMimeType(file_info.suffix());
+}
+
+void Request::responseFile(QFile & file, QMap<QString, QString> & header, quint16 code)
+{
+    header["Content-Type"] = getMimeType(file);
+    header["Content-Length"] = QString("%1").arg(file.size());
+
+    writeResponseHeader(socket, code, header);
+
+    if (!file.open(QFile::ReadOnly))
+        ;//TODO error
+
+    char * buffer = new char[s_buffer_size];
+    while (!file.atEnd())
+    {
+        qint64 len = file.read(buffer, s_buffer_size);
+        socket->write(buffer, len);
+        socket->flush();
+    }
+    delete[] buffer;
+}
+
+void Request::responseFile(QString filename, QMap<QString, QString> & header, quint16 code)
+{
+    QFile file(filename);
+    responseFile(file, header, code);
 }
 
 void Request::setRootPath(QString root_path)
@@ -99,45 +142,55 @@ void Request::run()
 
 void Request::onReadyRead()
 {
-    QMap<QString, QString> request_properties, response_properties;
-    getRequestProperties(socket, request_properties);
-
+    QMap<QString, QString> request_header, response_header;
+    getRequestHeader(socket, request_header);
 
     mutex_log.lock();
     Log::instance()
             << QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss") + ' '
             << '[' << socket->peerAddress().toString() << ']'
-            << ' ' << request_properties["_method"] << ' '
-            << request_properties["_path"] << ' '
+            << ' ' << request_header["_method"] << ' '
+            << request_header["_path"] << ' '
             << '[' << (int)QThread::currentThreadId() << ']' << ' ';
 
-    QFile file(s_root_path + request_properties["_path"]);
-    if (file.open(QFile::ReadOnly))
+    QFile file(s_root_path + request_header["_path"]);
+    QFileInfo file_info(file);
+    if (file_info.exists())
     {
-        Log::instance() << "200 Ok\n";
-        mutex_log.unlock();
-
-        response_properties["Content-Type"] = getMimeType(file);
-        response_properties["Content-Length"] = QString("%1").arg(file.size());
-        writeResponseHeader(socket, 200, response_properties);
-
-        char * buffer = new char[s_buffer_size];
-        while (!file.atEnd())
+        if (file_info.isDir())
         {
-            qint64 len = file.read(buffer, s_buffer_size);
-            socket->write(buffer, len);
-            socket->flush();
+            if (request_header["_path"].at(request_header["_path"].length() - 1) == '/')
+            {
+                Log::instance() << HTTP_STATUS_403 << '\n';
+                mutex_log.unlock();
+                responseFile("response/403.html", response_header, 403);
+            }
+            else
+            {
+                Log::instance() << HTTP_STATUS_301 << '\n';
+                mutex_log.unlock();
+                response_header["Location"] = "http://" + request_header["host"] + request_header["_path"] + '/';
+                responseFile("response/301.html", response_header, 301);
+            }
         }
-        delete[] buffer;
+        else if (file_info.isReadable())
+        {
+            Log::instance() << HTTP_STATUS_200 << '\n';
+            mutex_log.unlock();
+            responseFile(file, response_header, 200);
+        }
+        else
+        {
+            Log::instance() << HTTP_STATUS_403 << '\n';
+            mutex_log.unlock();
+            responseFile("response/403.html", response_header, 403);
+        }
     }
     else
     {
-        Log::instance() << "404 Not Found\n";
+        Log::instance() << HTTP_STATUS_404 << '\n';
         mutex_log.unlock();
-
-        response_properties["Content-Type"] = "text/html";
-        writeResponseHeader(socket, 404, response_properties);
-        socket->write("<h1>byvhttpd</h1><p>404 Not Fount.</p>");
+        responseFile("response/404.html", response_header, 404);
     }
 
     socket->close();

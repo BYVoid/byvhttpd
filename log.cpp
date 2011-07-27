@@ -2,6 +2,7 @@
 #include "settings.h"
 #include <iostream>
 #include <fstream>
+#include <QMutex>
 
 QMutex mutex;
 std::ofstream flog;

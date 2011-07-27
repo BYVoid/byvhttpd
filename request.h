@@ -4,6 +4,7 @@
 #include "common.h"
 #include <QThread>
 #include <QTcpSocket>
+#include <QFile>
 
 class Request : public QThread
 {
@@ -21,6 +22,9 @@ private:
 
     static QString s_root_path;
     static quint64 s_buffer_size;
+
+    void responseFile(QFile &file, QMap<QString, QString> &header, quint16 code);
+    void responseFile(QString filename, QMap<QString, QString> &header, quint16 code);
 
 public slots:
     void onReadyRead();
