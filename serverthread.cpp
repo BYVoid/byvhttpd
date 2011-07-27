@@ -19,10 +19,10 @@ void ServerThread::run()
     server = new Server();
     if (!server->start(m_port))
     {
-        Log::instance() << "failed to listen port " << m_port << '\n';
+        Log::instance() << "Failed to listen port " << m_port << Log::NEWLINE << Log::FLUSH;
         quit();
     }
-    Log::instance() << "listening port " << m_port << "\n";
+    Log::instance() << "Listening port " << m_port << Log::NEWLINE << Log::FLUSH;
     exec();
 }
 

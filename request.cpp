@@ -6,12 +6,9 @@
 #include <QStringList>
 #include <QFileInfo>
 #include <QDateTime>
-#include <QMutex>
 
 QString Request::s_root_path;
 quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
-
-QMutex mutex_log;
 
 bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
 {
@@ -48,15 +45,19 @@ void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QStrin
     {
     case 200:
         socket->write(HTTP_STATUS_200);
+        Log::instance() << HTTP_STATUS_200 << Log::NEWLINE << Log::FLUSH;
         break;
     case 301:
         socket->write(HTTP_STATUS_301);
+        Log::instance() << HTTP_STATUS_301 << Log::NEWLINE << Log::FLUSH;
         break;
     case 403:
         socket->write(HTTP_STATUS_403);
+        Log::instance() << HTTP_STATUS_403 << Log::NEWLINE << Log::FLUSH;
         break;
     case 404:
         socket->write(HTTP_STATUS_404);
+        Log::instance() << HTTP_STATUS_404 << Log::NEWLINE << Log::FLUSH;
         break;
     default:
         socket->write(QString(code).toAscii());
@@ -145,7 +146,6 @@ void Request::onReadyRead()
     QMap<QString, QString> request_header, response_header;
     getRequestHeader(socket, request_header);
 
-    mutex_log.lock();
     Log::instance()
             << QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss") + ' '
             << '[' << socket->peerAddress().toString() << ']'
@@ -161,35 +161,25 @@ void Request::onReadyRead()
         {
             if (request_header["_path"].at(request_header["_path"].length() - 1) == '/')
             {
-                Log::instance() << HTTP_STATUS_403 << '\n';
-                mutex_log.unlock();
                 responseFile("response/403.html", response_header, 403);
             }
             else
             {
-                Log::instance() << HTTP_STATUS_301 << '\n';
-                mutex_log.unlock();
                 response_header["Location"] = "http://" + request_header["host"] + request_header["_path"] + '/';
                 responseFile("response/301.html", response_header, 301);
             }
         }
         else if (file_info.isReadable())
         {
-            Log::instance() << HTTP_STATUS_200 << '\n';
-            mutex_log.unlock();
             responseFile(file, response_header, 200);
         }
         else
         {
-            Log::instance() << HTTP_STATUS_403 << '\n';
-            mutex_log.unlock();
             responseFile("response/403.html", response_header, 403);
         }
     }
     else
     {
-        Log::instance() << HTTP_STATUS_404 << '\n';
-        mutex_log.unlock();
         responseFile("response/404.html", response_header, 404);
     }
 

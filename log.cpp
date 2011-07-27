@@ -30,46 +30,81 @@ Log::Log()
         log_file = false;
 }
 
-Log & Log::operator <<(QString str)
+Log::~Log()
 {
     mutex.lock();
     if (show_log)
-        std::cout << str.toUtf8().data();
+    {
+        std::cout << buffer.localData()->str();
+        std::cout.flush();
+    }
     if (log_file)
-        flog << str.toUtf8().data();
+    {
+        flog << buffer.localData()->str();
+        flog.close();
+    }
     mutex.unlock();
+    if (buffer.hasLocalData())
+    {
+        delete buffer.localData();
+    }
+}
+
+Log & Log::operator <<(QString str)
+{
+    if (!buffer.hasLocalData())
+        buffer.setLocalData(new std::ostringstream);
+    * buffer.localData() << str.toUtf8().data();
     return *this;
 }
 
 Log & Log::operator << (int num)
 {
-    mutex.lock();
-    if (show_log)
-        std::cout << num;
-    if (log_file)
-        flog << num;
-    mutex.unlock();
+    if (!buffer.hasLocalData())
+        buffer.setLocalData(new std::ostringstream);
+    * buffer.localData() << num;
     return *this;
 }
 
 Log & Log::operator << (const char * str)
 {
-    mutex.lock();
-    if (show_log)
-        std::cout << str;
-    if (log_file)
-        flog << str;
-    mutex.unlock();
+    if (!buffer.hasLocalData())
+        buffer.setLocalData(new std::ostringstream);
+    * buffer.localData() << str;
     return *this;
 }
 
 Log & Log::operator << (const char chr)
 {
+    if (!buffer.hasLocalData())
+        buffer.setLocalData(new std::ostringstream);
+    * buffer.localData() << chr;
+    return *this;
+}
+
+Log & Log::operator << (ctrl_t code)
+{
+    if (!buffer.hasLocalData())
+        buffer.setLocalData(new std::ostringstream);
     mutex.lock();
-    if (show_log)
-        std::cout << chr;
-    if (log_file)
-        flog << chr;
+    if (code == FLUSH)
+    {
+        if (show_log)
+        {
+            std::cout << buffer.localData()->str();
+            std::cout.flush();
+        }
+        if (log_file)
+        {
+            flog << buffer.localData()->str();
+            flog.flush();
+        }
+        buffer.localData()->clear();
+    }
+    else if (code == NEWLINE)
+    {
+        * buffer.localData() << '\n';
+    }
     mutex.unlock();
     return *this;
 }

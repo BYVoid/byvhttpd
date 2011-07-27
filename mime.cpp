@@ -19,7 +19,7 @@ Mime::Mime()
     QFile mime_type_file(MIME_TYPE_FILE);
     if (!mime_type_file.open(QIODevice::ReadOnly))
     {
-        Log::instance() << "Can not open mime type defination file.";
+        Log::instance() << "Can not open mime type defination file." << Log::NEWLINE << Log::FLUSH;
         return;
     }
 
@@ -30,7 +30,7 @@ Mime::Mime()
         int pos = line.indexOf('\t');
         if (pos == -1)
         {
-            Log::instance() << "Mime type defination file format error.";
+            Log::instance() << "Mime type defination file format error." << Log::NEWLINE << Log::FLUSH;
             continue;
         }
 

@@ -9,7 +9,7 @@
 
 void initialize()
 {
-    Log::instance() << APPLICATION_NANE << '\n';
+    Log::instance() << APPLICATION_NANE << Log::NEWLINE << Log::FLUSH;
 
     QString root_path = Settings::instance().value("site/root_path").toString();
     Request::setRootPath(root_path);
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     QVariantList port_list = Settings::instance().value("httpd/port").toList();
     if (port_list.size() == 0)
     {
-        Log::instance() << "No port specified to listen.\n";
+        Log::instance() << "No port specified to listen." << Log::NEWLINE << Log::FLUSH;
         return 1;
     }
 
