@@ -32,20 +32,20 @@ Log::Log()
 
 Log::~Log()
 {
-    mutex.lock();
-    if (show_log)
-    {
-        std::cout << buffer.localData()->str();
-        std::cout.flush();
-    }
-    if (log_file)
-    {
-        flog << buffer.localData()->str();
-        flog.close();
-    }
-    mutex.unlock();
     if (buffer.hasLocalData())
     {
+        mutex.lock();
+        if (show_log)
+        {
+            std::cout << buffer.localData()->str();
+            std::cout.flush();
+        }
+        if (log_file)
+        {
+            flog << buffer.localData()->str();
+            flog.close();
+        }
+        mutex.unlock();
         delete buffer.localData();
     }
 }
