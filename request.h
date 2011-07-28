@@ -23,12 +23,9 @@ private:
 
     static bool s_initialized;
     static QString s_root_path;
-    static quint64 s_buffer_size;
     static QStringList s_index;
 
     bool getRequestHeader();
-    void writeResponseHeader();
-    void responseFile();
     void tryResponseFile(QString filename);
 
     static void initialize();

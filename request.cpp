@@ -1,7 +1,7 @@
 #include "request.h"
 #include "log.h"
-#include "mime.h"
 #include "settings.h"
+#include "responsefile.h"
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
@@ -9,14 +9,12 @@
 #include <QDateTime>
 
 QString Request::s_root_path;
-quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
 QStringList Request::s_index;
 bool Request::s_initialized = false;
 
 void Request::initialize()
 {
     s_initialized = true;
-    s_buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
     s_root_path = Settings::instance().value("site/root_path").toString();
     s_index = Settings::instance().value("site/index").toStringList();
 }
@@ -69,78 +67,6 @@ bool Request::getRequestHeader()
     return true;
 }
 
-void Request::writeResponseHeader()
-{
-    socket->write("HTTP/1.0 ");
-
-    switch (response_code)
-    {
-    case 200:
-        socket->write(HTTP_STATUS_200);
-        Log::instance() << HTTP_STATUS_200 << Log::NEWLINE << Log::FLUSH;
-        break;
-    case 301:
-        socket->write(HTTP_STATUS_301);
-        Log::instance() << HTTP_STATUS_301 << Log::NEWLINE << Log::FLUSH;
-        break;
-    case 403:
-        socket->write(HTTP_STATUS_403);
-        Log::instance() << HTTP_STATUS_403 << Log::NEWLINE << Log::FLUSH;
-        break;
-    case 404:
-        socket->write(HTTP_STATUS_404);
-        Log::instance() << HTTP_STATUS_404 << Log::NEWLINE << Log::FLUSH;
-        break;
-    default:
-        socket->write(QString(response_code).toAscii());
-    }
-
-    socket->write("\r\n");
-
-    response_header["Server"] = APPLICATION_IDENTIFIER;
-    response_header["Connection"] = "close";
-    response_header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
-
-    QMap<QString,QString>::iterator i;
-    for (i = response_header.begin(); i != response_header.end(); ++i)
-    {
-        socket->write(i.key().toAscii());
-        socket->write(": ");
-        socket->write(i.value().toAscii());
-        socket->write("\r\n");
-    }
-    socket->write("\r\n");
-}
-
-void Request::responseFile()
-{
-    if (response_code != 200)
-    {
-        response_filename = QString("response/%1.html").arg(response_code);
-    }
-
-    QFile file(response_filename);
-    QFileInfo file_info(file);
-    response_header["Content-Type"] = Mime::instance().getMimeType(file_info.suffix());
-    response_header["Content-Length"] = QString("%1").arg(file.size());
-
-    writeResponseHeader();
-
-    if (!file.open(QFile::ReadOnly))
-        ;//TODO error
-
-    char * buffer = new char[s_buffer_size];
-    while (!file.atEnd())
-    {
-        qint64 len = file.read(buffer, s_buffer_size);
-        socket->write(buffer, len);
-        socket->flush();
-    }
-    delete[] buffer;
-
-    socket->close();
-}
-
 void Request::tryResponseFile(QString filename)
 {
     QFileInfo file_info(filename);
@@ -188,7 +114,6 @@ void Request::tryResponseFile(QString filename)
     }
 }
 
-
 void Request::onReadyRead()
 {
     if (!getRequestHeader())
@@ -201,9 +126,12 @@ void Request::onReadyRead()
             << request_header["_path"] << ' '
             << '[' << (int)QThread::currentThreadId() << ']' << ' ';
 
-    QString path = s_root_path + request_header["_path"];
-    tryResponseFile(path);
-    responseFile();
+    tryResponseFile(s_root_path + request_header["_path"]);
+
+    Response * response;
+    response = new ResponseFile(socket, response_code, response_header, response_filename);
+    response->response();
+    socket->close();
 }
 
 void Request::onDisconnected()

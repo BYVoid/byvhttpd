@@ -21,7 +21,9 @@ SOURCES += main.cpp \
     request.cpp \
     settings.cpp \
     serverthread.cpp \
-    mime.cpp
+    mime.cpp \
+    response.cpp \
+    responsefile.cpp
 
 HEADERS += \
     server.h \
@@ -30,4 +32,6 @@ HEADERS += \
     settings.h \
     serverthread.h \
     common.h \
-    mime.h
+    mime.h \
+    response.h \
+    responsefile.h
