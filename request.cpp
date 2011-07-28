@@ -10,9 +10,39 @@
 
 QString Request::s_root_path;
 quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
+QStringList Request::s_index;
 bool Request::s_initialized = false;
 
-bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
+void Request::initialize()
+{
+    s_initialized = true;
+    s_buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
+    s_root_path = Settings::instance().value("site/root_path").toString();
+    s_index = Settings::instance().value("site/index").toStringList();
+}
+
+Request::Request(int socketDescriptor, QObject *parent) :
+    QThread(parent)
+{
+    if (!s_initialized)
+        initialize();
+    this->socketDescriptor = socketDescriptor;
+    connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
+    connect(this, SIGNAL(terminated()), this, SLOT(deleteLater()));
+}
+
+void Request::run()
+{
+    socket = new QTcpSocket();
+    if (!socket->setSocketDescriptor(socketDescriptor))
+        return; //TODO error
+
+    connect(socket, SIGNAL(readyRead()), this, SLOT(onReadyRead()), Qt::DirectConnection);
+    connect(socket, SIGNAL(disconnected()), this, SLOT(onDisconnected()), Qt::DirectConnection);
+    exec();
+}
+
+bool Request::getRequestHeader()
 {
     QByteArray buffer = socket->readAll();
     QTextStream reader(buffer, QIODevice::ReadOnly);
@@ -21,9 +51,9 @@ bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
     if (sec.count() != 3)
         return false;
 
-    header["_method"] = sec[0];
-    header["_path"] = sec[1];
-    header["_protocol"] = sec[2];
+    request_header["_method"] = sec[0];
+    request_header["_path"] = sec[1];
+    request_header["_protocol"] = sec[2];
 
     while (!reader.atEnd())
     {
@@ -33,17 +63,17 @@ bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
             continue;
         QString key = line.mid(0, pos).toLower();
         QString value = line.mid(pos + 2);
-        header[key] = value;
+        request_header[key] = value;
     }
 
     return true;
 }
 
-void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QString> & header)
+void Request::writeResponseHeader()
 {
     socket->write("HTTP/1.0 ");
 
-    switch (code)
+    switch (response_code)
     {
     case 200:
         socket->write(HTTP_STATUS_200);
@@ -62,38 +92,39 @@ void writeResponseHeader(QTcpSocket * socket, quint16 code, QMap<QString, QStrin
         Log::instance() << HTTP_STATUS_404 << Log::NEWLINE << Log::FLUSH;
         break;
     default:
-        socket->write(QString(code).toAscii());
+        socket->write(QString(response_code).toAscii());
     }
 
     socket->write("\r\n");
 
-    header["Server"] = APPLICATION_IDENTIFIER;
-    header["Connection"] = "close";
-    header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
+    response_header["Server"] = APPLICATION_IDENTIFIER;
+    response_header["Connection"] = "close";
+    response_header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
 
-    QMap<QString,QString>::iterator it;
-    for (it = header.begin(); it != header.end(); ++it)
+    QMap<QString,QString>::iterator i;
+    for (i = response_header.begin(); i != response_header.end(); ++i)
     {
-        socket->write(it.key().toAscii());
+        socket->write(i.key().toAscii());
         socket->write(": ");
-        socket->write(it.value().toAscii());
+        socket->write(i.value().toAscii());
         socket->write("\r\n");
     }
     socket->write("\r\n");
 }
 
-QString getMimeType(QFile & file)
+void Request::responseFile()
 {
+    if (response_code != 200)
+    {
+        response_filename = QString("response/%1.html").arg(response_code);
+    }
+
+    QFile file(response_filename);
     QFileInfo file_info(file);
-    return Mime::instance().getMimeType(file_info.suffix());
-}
+    response_header["Content-Type"] = Mime::instance().getMimeType(file_info.suffix());
+    response_header["Content-Length"] = QString("%1").arg(file.size());
 
-void Request::responseFile(QFile & file, QMap<QString, QString> & header, quint16 code)
-{
-    header["Content-Type"] = getMimeType(file);
-    header["Content-Length"] = QString("%1").arg(file.size());
-
-    writeResponseHeader(socket, code, header);
+    writeResponseHeader();
 
     if (!file.open(QFile::ReadOnly))
         ;//TODO error
@@ -106,46 +137,62 @@ void Request::responseFile(QFile & file, QMap<QString, QString> & header, quint1
         socket->flush();
     }
     delete[] buffer;
+
+    socket->close();
 }
 
-void Request::responseFile(QString filename, QMap<QString, QString> & header, quint16 code)
+void Request::tryResponseFile(QString filename)
 {
-    QFile file(filename);
-    responseFile(file, header, code);
+    QFileInfo file_info(filename);
+
+    if (file_info.isDir())
+    {
+        if (request_header["_path"].at(request_header["_path"].length() - 1) == '/')
+        {
+            if (s_index.size() != 0)
+            {
+                for (QStringList::Iterator i = s_index.begin(); i != s_index.end(); ++i)
+                {
+                    tryResponseFile(filename + *i);
+                    if (response_code != 404)
+                        return;
+                }
+                response_code = 404;
+            }
+            else
+            {
+                response_code = 403;
+            }
+        }
+        else
+        {
+            response_header["Location"] = "http://" + request_header["host"] + request_header["_path"] + '/';
+            response_code = 301;
+        }
+    }
+    else if (file_info.exists())
+    {
+        if (file_info.isReadable())
+        {
+            response_filename = filename;
+            response_code = 200;
+        }
+        else
+        {
+            response_code = 403;
+        }
+    }
+    else
+    {
+        response_code = 404;
+    }
 }
 
-void Request::initialize()
-{
-    s_initialized = true;
-    s_root_path = Settings::instance().value("site/root_path").toString();
-    s_buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
-}
-
-Request::Request(int socketDescriptor, QObject *parent) :
-    QThread(parent)
-{
-    if (!s_initialized)
-        initialize();
-    this->socketDescriptor = socketDescriptor;
-    connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
-    connect(this, SIGNAL(terminated()), this, SLOT(deleteLater()));
-}
-
-void Request::run()
-{
-    socket = new QTcpSocket();
-    if (!socket->setSocketDescriptor(socketDescriptor))
-        return;
-
-    connect(socket, SIGNAL(readyRead()), this, SLOT(onReadyRead()), Qt::DirectConnection);
-    connect(socket, SIGNAL(disconnected()), this, SLOT(onDisconnected()), Qt::DirectConnection);
-    exec();
-}
 
 void Request::onReadyRead()
 {
-    QMap<QString, QString> request_header, response_header;
-    getRequestHeader(socket, request_header);
+    if (!getRequestHeader())
+        return;
 
     Log::instance()
             << QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss") + ' '
@@ -154,37 +201,9 @@ void Request::onReadyRead()
             << request_header["_path"] << ' '
             << '[' << (int)QThread::currentThreadId() << ']' << ' ';
 
-    QFile file(s_root_path + request_header["_path"]);
-    QFileInfo file_info(file);
-    if (file_info.exists())
-    {
-        if (file_info.isDir())
-        {
-            if (request_header["_path"].at(request_header["_path"].length() - 1) == '/')
-            {
-                responseFile("response/403.html", response_header, 403);
-            }
-            else
-            {
-                response_header["Location"] = "http://" + request_header["host"] + request_header["_path"] + '/';
-                responseFile("response/301.html", response_header, 301);
-            }
-        }
-        else if (file_info.isReadable())
-        {
-            responseFile(file, response_header, 200);
-        }
-        else
-        {
-            responseFile("response/403.html", response_header, 403);
-        }
-    }
-    else
-    {
-        responseFile("response/404.html", response_header, 404);
-    }
-
-    socket->close();
+    QString path = s_root_path + request_header["_path"];
+    tryResponseFile(path);
+    responseFile();
 }
 
 void Request::onDisconnected()

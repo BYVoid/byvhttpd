@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QTcpSocket>
 #include <QFile>
+#include <QStringList>
 
 class Request : public QThread
 {
@@ -16,13 +17,19 @@ public:
 private:
     int socketDescriptor;
     QTcpSocket * socket;
+    QMap<QString, QString> request_header, response_header;
+    quint16 response_code;
+    QString response_filename;
 
+    static bool s_initialized;
     static QString s_root_path;
     static quint64 s_buffer_size;
-    static bool s_initialized;
+    static QStringList s_index;
 
-    void responseFile(QFile &file, QMap<QString, QString> &header, quint16 code);
-    void responseFile(QString filename, QMap<QString, QString> &header, quint16 code);
+    bool getRequestHeader();
+    void writeResponseHeader();
+    void responseFile();
+    void tryResponseFile(QString filename);
 
     static void initialize();
 
