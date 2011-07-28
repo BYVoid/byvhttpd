@@ -1,6 +1,7 @@
 #include "request.h"
 #include "log.h"
 #include "mime.h"
+#include "settings.h"
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
@@ -9,6 +10,7 @@
 
 QString Request::s_root_path;
 quint64 Request::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
+bool Request::s_initialized = false;
 
 bool getRequestHeader(QTcpSocket * socket, QMap<QString, QString> & header)
 {
@@ -112,19 +114,18 @@ void Request::responseFile(QString filename, QMap<QString, QString> & header, qu
     responseFile(file, header, code);
 }
 
-void Request::setRootPath(QString root_path)
+void Request::initialize()
 {
-    s_root_path = root_path;
-}
-
-void Request::setBufferSize(quint64 buffer_size)
-{
-    s_buffer_size = buffer_size;
+    s_initialized = true;
+    s_root_path = Settings::instance().value("site/root_path").toString();
+    s_buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
 }
 
 Request::Request(int socketDescriptor, QObject *parent) :
     QThread(parent)
 {
+    if (!s_initialized)
+        initialize();
     this->socketDescriptor = socketDescriptor;
     connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
     connect(this, SIGNAL(terminated()), this, SLOT(deleteLater()));

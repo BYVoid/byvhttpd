@@ -13,18 +13,18 @@ public:
     Request(int socketDescriptor, QObject *parent = 0);
     virtual void run();
 
-    static void setRootPath(QString root_path);
-    static void setBufferSize(quint64 buffer_size);
-
 private:
     int socketDescriptor;
     QTcpSocket * socket;
 
     static QString s_root_path;
     static quint64 s_buffer_size;
+    static bool s_initialized;
 
     void responseFile(QFile &file, QMap<QString, QString> &header, quint16 code);
     void responseFile(QString filename, QMap<QString, QString> &header, quint16 code);
+
+    static void initialize();
 
 public slots:
     void onReadyRead();
