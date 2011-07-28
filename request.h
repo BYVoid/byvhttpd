@@ -2,6 +2,7 @@
 #define REQUEST_H
 
 #include "common.h"
+#include "response.h"
 #include <QThread>
 #include <QTcpSocket>
 #include <QFile>
@@ -20,6 +21,7 @@ private:
     QMap<QString, QString> request_header, response_header;
     quint16 response_code;
     QString response_filename;
+    Response * response;
 
     static bool s_initialized;
     static QString s_root_path;

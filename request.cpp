@@ -1,7 +1,8 @@
-#include "request.h"
 #include "log.h"
 #include "settings.h"
+#include "request.h"
 #include "responsefile.h"
+#include "responsedirectory.h"
 #include <QHostAddress>
 #include <QTextStream>
 #include <QStringList>
@@ -20,7 +21,8 @@ void Request::initialize()
 }
 
 Request::Request(int socketDescriptor, QObject *parent) :
-    QThread(parent)
+    QThread(parent),
+    response(NULL)
 {
     if (!s_initialized)
         initialize();
@@ -87,7 +89,8 @@ void Request::tryResponseFile(QString filename)
             }
             else
             {
-                response_code = 403;
+                response = new ResponseDirectory(socket, response_header, filename, request_header["_path"]);
+                //response_code = 403;
             }
         }
         else
@@ -128,8 +131,11 @@ void Request::onReadyRead()
 
     tryResponseFile(s_root_path + request_header["_path"]);
 
-    Response * response;
-    response = new ResponseFile(socket, response_code, response_header, response_filename);
+    if (response == NULL)
+    {
+        response = new ResponseFile(socket, response_code, response_header, response_filename);
+    }
+
     response->response();
     socket->close();
 }
