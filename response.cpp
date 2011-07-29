@@ -1,6 +1,8 @@
 #include "response.h"
 #include "log.h"
+#include "httpstatus.h"
 #include <QDateTime>
+#include <QLocale>
 
 Response::Response(QTcpSocket * socket, quint16 http_status_code, QMap<QString, QString> & header):
     m_socket(socket),
@@ -9,7 +11,7 @@ Response::Response(QTcpSocket * socket, quint16 http_status_code, QMap<QString, 
 {
     m_header["Server"] = APPLICATION_IDENTIFIER;
     m_header["Connection"] = "close";
-    m_header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
+    m_header["Date"] =  QLocale(QLocale::English).toString(QDateTime::currentDateTimeUtc(), "ddd, d MMM yyyy hh:mm:ss") + " GMT";
 }
 
 void Response::responseHeader()
@@ -39,10 +41,6 @@ void Response::responseHeader()
     }
 
     m_socket->write("\r\n");
-
-    m_header["Server"] = APPLICATION_IDENTIFIER;
-    m_header["Connection"] = "close";
-    m_header["Date"] = QDateTime::currentDateTimeUtc().toString("ddd, d MMM yyyy hh:mm:ss") + " GMT";
 
     QMap<QString,QString>::iterator i;
     for (i = m_header.begin(); i != m_header.end(); ++i)

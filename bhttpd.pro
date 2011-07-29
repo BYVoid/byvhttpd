@@ -36,4 +36,5 @@ HEADERS += \
     mime.h \
     response.h \
     responsefile.h \
-    responsedirectory.h
+    responsedirectory.h \
+    httpstatus.h

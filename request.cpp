@@ -126,8 +126,7 @@ void Request::onReadyRead()
             << QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss") + ' '
             << '[' << socket->peerAddress().toString() << ']'
             << ' ' << request_header["_method"] << ' '
-            << request_header["_path"] << ' '
-            << '[' << (int)QThread::currentThreadId() << ']' << ' ';
+            << request_header["_path"] << ' ';
 
     tryResponseFile(s_root_path + request_header["_path"]);
 
