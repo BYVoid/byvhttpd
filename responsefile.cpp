@@ -26,6 +26,7 @@ ResponseFile::ResponseFile(QTcpSocket * socket, quint16 http_status_code, QMap<Q
     QFileInfo file_info(m_filename);
     m_header["Content-Type"] = Mime::instance().getMimeType(file_info.suffix());
     m_header["Content-Length"] = QString("%1").arg(file_info.size());
+    m_header["Last-Modified"] = Common::getTimeStampString(file_info.lastModified().toUTC());
 }
 
 void ResponseFile::response()

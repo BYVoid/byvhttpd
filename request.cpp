@@ -103,6 +103,15 @@ void Request::tryResponseFile(QString filename)
     {
         if (file_info.isReadable())
         {
+            if (request_header.contains("if-modified-since"))
+            {
+                if (request_header["if-modified-since"] == Common::getTimeStampString(file_info.lastModified().toUTC()))
+                {
+                    response_code = 304;
+                    return;
+                }
+            }
+
             response_filename = filename;
             response_code = 200;
         }

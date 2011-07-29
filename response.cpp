@@ -2,7 +2,6 @@
 #include "log.h"
 #include "httpstatus.h"
 #include <QDateTime>
-#include <QLocale>
 
 Response::Response(QTcpSocket * socket, quint16 http_status_code, QMap<QString, QString> & header):
     m_socket(socket),
@@ -11,7 +10,7 @@ Response::Response(QTcpSocket * socket, quint16 http_status_code, QMap<QString, 
 {
     m_header["Server"] = APPLICATION_IDENTIFIER;
     m_header["Connection"] = "close";
-    m_header["Date"] =  QLocale(QLocale::English).toString(QDateTime::currentDateTimeUtc(), "ddd, d MMM yyyy hh:mm:ss") + " GMT";
+    m_header["Date"] =  Common::getTimeStampString();
 }
 
 void Response::responseHeader()
@@ -27,6 +26,10 @@ void Response::responseHeader()
     case 301:
         m_socket->write(HTTP_STATUS_301);
         Log::instance() << HTTP_STATUS_301 << Log::NEWLINE << Log::FLUSH;
+        break;
+    case 304:
+        m_socket->write(HTTP_STATUS_304);
+        Log::instance() << HTTP_STATUS_304 << Log::NEWLINE << Log::FLUSH;
         break;
     case 403:
         m_socket->write(HTTP_STATUS_403);

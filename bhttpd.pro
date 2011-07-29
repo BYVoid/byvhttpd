@@ -24,7 +24,8 @@ SOURCES += main.cpp \
     mime.cpp \
     response.cpp \
     responsefile.cpp \
-    responsedirectory.cpp
+    responsedirectory.cpp \
+    common.cpp
 
 HEADERS += \
     server.h \

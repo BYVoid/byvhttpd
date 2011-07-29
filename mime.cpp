@@ -3,7 +3,6 @@
 #include <QFile>
 #include <QTextStream>
 #include <QStringList>
-#include <QDebug>
 
 Mime * Mime::m_instance = NULL;
 
