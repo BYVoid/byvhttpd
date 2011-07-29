@@ -9,7 +9,7 @@ class Server : public QTcpServer
     Q_OBJECT
 public:
     explicit Server(QObject *parent = 0);
-    bool start(quint16 port);
+    bool start(QHostAddress address, quint16 port);
 
 protected:
     void incomingConnection(int socketDescriptor);

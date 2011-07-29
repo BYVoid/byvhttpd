@@ -4,6 +4,7 @@
 #include "common.h"
 #include "server.h"
 #include <QThread>
+#include <QHostAddress>
 
 class ServerThread : public QThread
 {
@@ -13,10 +14,12 @@ public:
     virtual ~ServerThread();
     virtual void run();
     void setPort(quint16 port);
+    void setAddress(QHostAddress address);
 
 private:
     Server * server;
     quint16 m_port;
+    QHostAddress m_address;
 
 signals:
 

@@ -6,9 +6,9 @@ Server::Server(QObject *parent) :
 {
 }
 
-bool Server::start(quint16 port)
+bool Server::start(QHostAddress address, quint16 port)
 {
-    return listen(QHostAddress::Any, port);
+    return listen(address, port);
 }
 
 void Server::incomingConnection(int socketDescriptor)

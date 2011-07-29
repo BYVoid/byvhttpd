@@ -10,6 +10,8 @@
 void startInstance(quint16 port)
 {
     ServerThread * server_thread = new ServerThread();
+    if (!Settings::instance().value("httpd/ipv6", true).toBool())
+        server_thread->setAddress(QHostAddress::Any);
     server_thread->setPort(port);
     server_thread->start();
 }
