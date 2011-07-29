@@ -30,6 +30,7 @@ private:
     static bool s_initialized;
     static QString s_root_path;
     static QStringList s_index;
+    static bool s_dir_listing;
     static bool s_keep_alive_enable;
     static bool s_keep_alive_default;
     static quint32 s_keep_alive_timeout;

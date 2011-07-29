@@ -11,6 +11,7 @@
 
 QString Request::s_root_path;
 QStringList Request::s_index;
+bool Request::s_dir_listing;
 bool Request::s_keep_alive_enable;
 bool Request::s_keep_alive_default;
 quint32 Request::s_keep_alive_timeout;
@@ -23,6 +24,7 @@ void Request::initialize()
     s_initialized = true;
     s_root_path = Settings::instance().value("site/root_path").toString();
     s_index = Settings::instance().value("site/index").toStringList();
+    s_dir_listing = Settings::instance().value("site/dir_listing", DEFAULT_SITE_DIR_LISTING).toBool();
 
     s_keep_alive_enable = Settings::instance().value("request/keep_alive_enable", DEFAULT_REQUEST_KEEP_ALIVE_ENABLE).toBool();
     s_keep_alive_default = Settings::instance().value("request/keep_alive_default", DEFAULT_REQUEST_KEEP_ALIVE_DEFAULT).toBool();
@@ -144,17 +146,28 @@ void Request::tryResponseFile(QString filename)
                         return;
                 }
                 response_code = 404;
+                return;
             }
             else
             {
-                response = new ResponseDirectory(socket, response_header, filename, request_header["_path"]);
-                //response_code = 403;
+                if (s_dir_listing)
+                {
+                    response_code = 200;
+                    response = new ResponseDirectory(socket, response_header, filename, request_header["_path"]);
+                    return;
+                }
+                else
+                {
+                    response_code = 403;
+                    return;
+                }
             }
         }
         else
         {
             response_header["Location"] = "http://" + request_header["host"] + request_header["_path"] + '/';
             response_code = 301;
+            return;
         }
     }
     else if (file_info.exists())
@@ -172,15 +185,18 @@ void Request::tryResponseFile(QString filename)
 
             response_filename = filename;
             response_code = 200;
+            return;
         }
         else
         {
             response_code = 403;
+            return;
         }
     }
     else
     {
         response_code = 404;
+        return;
     }
 }
 
@@ -215,10 +231,9 @@ void Request::onReadyRead()
 
     response->response();
 
-    clearStatus();
-
     if (s_keep_alive_enable && keep_alive)
     {
+        clearStatus();
         keep_alive_timer.setInterval(keep_alive_timeout);
         keep_alive_timer.start();
     }
