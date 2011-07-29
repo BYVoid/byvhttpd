@@ -9,7 +9,6 @@ Response::Response(QTcpSocket * socket, quint16 http_status_code, QMap<QString, 
     m_header(header)
 {
     m_header["Server"] = APPLICATION_IDENTIFIER;
-    m_header["Connection"] = "close";
     m_header["Date"] =  Common::getTimeStampString();
 }
 

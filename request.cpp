@@ -11,13 +11,29 @@
 
 QString Request::s_root_path;
 QStringList Request::s_index;
+bool Request::s_keep_alive_enable;
+bool Request::s_keep_alive_default;
+quint32 Request::s_keep_alive_timeout;
+quint32 Request::s_keep_alive_timeout_max;
 bool Request::s_initialized = false;
 
 void Request::initialize()
 {
+    bool ok;
     s_initialized = true;
     s_root_path = Settings::instance().value("site/root_path").toString();
     s_index = Settings::instance().value("site/index").toStringList();
+
+    s_keep_alive_enable = Settings::instance().value("request/keep_alive_enable", DEFAULT_REQUEST_KEEP_ALIVE_ENABLE).toBool();
+    s_keep_alive_default = Settings::instance().value("request/keep_alive_default", DEFAULT_REQUEST_KEEP_ALIVE_DEFAULT).toBool();
+
+    s_keep_alive_timeout = Settings::instance().value("request/keep_alive_timeout", DEFAULT_REQUEST_KEEP_ALIVE_TIMEOUT).toUInt(&ok);
+    if (!ok)
+        s_keep_alive_timeout = DEFAULT_REQUEST_KEEP_ALIVE_TIMEOUT;
+
+    s_keep_alive_timeout_max = Settings::instance().value("request/keep_alive_timeout_max", DEFAULT_REQUEST_KEEP_ALIVE_TIMEOUT_MAX).toUInt(&ok);
+    if (!ok)
+        s_keep_alive_timeout_max = DEFAULT_REQUEST_KEEP_ALIVE_TIMEOUT_MAX;
 }
 
 Request::Request(int socketDescriptor, QObject *parent) :
@@ -29,6 +45,26 @@ Request::Request(int socketDescriptor, QObject *parent) :
     this->socketDescriptor = socketDescriptor;
     connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
     connect(this, SIGNAL(terminated()), this, SLOT(deleteLater()));
+
+    if (s_keep_alive_enable)
+    {
+        keep_alive = s_keep_alive_default;
+        keep_alive_timeout = s_keep_alive_timeout * 1000;
+        connect(&keep_alive_timer, SIGNAL(timeout()), this, SLOT(onTimeout()));
+        keep_alive_timer.setSingleShot(true);
+        keep_alive_timer.setInterval(keep_alive_timeout);
+        keep_alive_timer.start();
+    }
+}
+
+void Request::clearStatus()
+{
+    delete response;
+    response = NULL;
+    request_header.clear();
+    response_header.clear();
+    response_code = 0;
+    response_filename.clear();
 }
 
 void Request::run()
@@ -64,6 +100,28 @@ bool Request::getRequestHeader()
         QString key = line.mid(0, pos).toLower();
         QString value = line.mid(pos + 2);
         request_header[key] = value;
+    }
+
+    if (s_keep_alive_enable)
+    {
+        if (request_header.contains("connection"))
+        {
+            keep_alive = request_header["connection"].toLower() == "keep-alive";
+            if (request_header.contains("keep-alive"))
+            {
+                bool ok;
+                keep_alive_timeout = request_header["keep-alive"].toUInt(&ok);
+                if (!ok || keep_alive_timeout > s_keep_alive_timeout_max)
+                {
+                    keep_alive_timeout = s_keep_alive_timeout_max;
+                }
+                keep_alive_timeout *= 1000;
+            }
+        }
+        else
+        {
+            keep_alive = s_keep_alive_default;
+        }
     }
 
     return true;
@@ -131,6 +189,17 @@ void Request::onReadyRead()
     if (!getRequestHeader())
         return;
 
+    keep_alive_timer.stop();
+
+    if (s_keep_alive_enable && keep_alive)
+    {
+        response_header["Connection"] = "keep-alive";
+    }
+    else
+    {
+        response_header["Connection"] = "close";
+    }
+
     Log::instance()
             << QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss") + ' '
             << '[' << socket->peerAddress().toString() << ']'
@@ -145,11 +214,28 @@ void Request::onReadyRead()
     }
 
     response->response();
-    socket->close();
+
+    clearStatus();
+
+    if (s_keep_alive_enable && keep_alive)
+    {
+        keep_alive_timer.setInterval(keep_alive_timeout);
+        keep_alive_timer.start();
+    }
+    else
+    {
+        socket->close();
+    }
 }
 
 void Request::onDisconnected()
 {
     socket->deleteLater();
     quit();
+}
+
+void Request::onTimeout()
+{
+    qDebug() << "Connection timeout.";
+    onDisconnected();
 }

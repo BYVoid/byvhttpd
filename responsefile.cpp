@@ -5,12 +5,12 @@
 #include <QFileInfo>
 
 bool ResponseFile::s_initialized = false;
-quint64 ResponseFile::s_buffer_size = DEFAULT_HTTPD_BUFFER_SIZE;
+quint64 ResponseFile::s_buffer_size = DEFAULT_REQUEST_BUFFER_SIZE;
 
 void ResponseFile::initialize()
 {
     s_initialized = true;
-    s_buffer_size = Settings::instance().value("httpd/buffer_size", DEFAULT_HTTPD_BUFFER_SIZE).toULongLong();
+    s_buffer_size = Settings::instance().value("request/buffer_size", DEFAULT_REQUEST_BUFFER_SIZE).toULongLong();
 }
 
 ResponseFile::ResponseFile(QTcpSocket * socket, quint16 http_status_code, QMap<QString, QString> & header, QString filename):
