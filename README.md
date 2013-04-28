@@ -13,3 +13,5 @@ A toy http server based on Qt.
   * 目錄瀏覽
   * 目錄index頁面遞歸指定
   * 訪問日誌
+
+MIT License
